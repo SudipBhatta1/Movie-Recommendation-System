@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ movie.title }} — WatchNext Admin{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <div class="admin-header">
+    <div>
+      <a href="{{ url_for('admin_dashboard') }}" class="back-link">← Back to Dashboard</a>
+      <h1>Edit Movie</h1>
+      <p>Changes retrain the ML model automatically</p>
+    </div>
+  </div>
+  <div class="form-card">
+    <form method="POST" class="movie-form">
+      <div class="form-row">
+        <div class="form-group"><label>Title *</label><input type="text" name="title" value="{{ movie.title }}" required></div>
+        <div class="form-group"><label>Year *</label><input type="number" name="year" value="{{ movie.year }}" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Genre * <small>separate with |</small></label><input type="text" name="genre" value="{{ movie.genre }}" required></div>
+        <div class="form-group"><label>Rating *</label><input type="number" name="rating" value="{{ movie.rating }}" step="0.1" min="0" max="10" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Director</label><input type="text" name="director" value="{{ movie.director or '' }}"></div>
+        <div class="form-group"><label>Runtime <small>minutes</small></label><input type="number" name="runtime" value="{{ movie.runtime or '' }}"></div>
+      </div>
+      <div class="form-group"><label>Cast <small>separate with |</small></label><input type="text" name="cast" value="{{ movie.cast or '' }}"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Language</label><input type="text" name="language" value="{{ movie.language or '' }}"></div>
+        <div class="form-group"><label>YouTube Trailer ID</label><input type="text" name="trailer_id" value="{{ movie.trailer_id or '' }}"></div>
+      </div>
+      <div class="form-group"><label>Description *</label><textarea name="description" rows="4" required>{{ movie.description }}</textarea></div>
+      <div class="form-group"><label>Poster URL</label><input type="url" name="poster_url" value="{{ movie.poster_url or '' }}"></div>
+      <div class="form-actions">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn-secondary">Cancel</a>
+        <button type="submit" class="btn-primary">Save & Retrain →</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
