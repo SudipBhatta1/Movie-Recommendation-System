@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Manage Users — Admin{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <div class="admin-header">
+    <div class="admin-header-inner">
+      <a href="{{ url_for('admin_dashboard') }}" class="back-link">← Back to Dashboard</a>
+      <h1 class="admin-title">👥 User Management</h1>
+      <p class="admin-sub">{{ users|length }} registered users</p>
+    </div>
+  </div>
+
+  <div class="admin-body">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Registered</th>
+            <th>Movies Watched</th>
+            <th>Feedback Given</th>
+            <th>Reset Password</th>
+            <th>Delete</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>
+              <strong>{{ u.username }}</strong>
+            </td>
+            <td>{{ u.created_at }}</td>
+            <td>{{ u.movies_watched }}</td>
+            <td>{{ u.feedback_count }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('admin_reset_password', username=u.username) }}"
+                    class="inline-form" onsubmit="return validateReset(this)">
+                <input type="password" name="new_password" placeholder="New password"
+                       class="admin-pwd-input" minlength="6">
+                <button type="submit" class="btn-edit">Reset</button>
+              </form>
+            </td>
+            <td>
+              <form method="POST" action="{{ url_for('admin_delete_user', username=u.username) }}"
+                    onsubmit="return confirm('Delete user {{ u.username }}? This cannot be undone.')">
+                <button type="submit" class="btn-delete-user">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">
+              No users registered yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function validateReset(form) {
+  const pwd = form.querySelector('input[name="new_password"]').value.trim();
+  if (!pwd || pwd.length < 6) {
+    alert('Password must be at least 6 characters.');
+    return false;
+  }
+  return confirm('Reset password for this user?');
+}
+</script>
+{% endblock %}

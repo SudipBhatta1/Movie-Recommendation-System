@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{{ movie.title }} — WatchNext{% endblock %}
+{% block content %}
+<div class="detail-page">
+
+  <!-- HERO BANNER -->
+  <div class="detail-banner">
+    <div class="detail-banner-bg" style="background:linear-gradient(135deg,hsl({{movie.id*37%360}},30%,18%),hsl({{(movie.id*37+80)%360}},40%,25%))"></div>
+    <div class="detail-banner-inner">
+      <a href="{{ url_for('index') }}" class="back-link">← Back to Home</a>
+      <div class="detail-layout">
+
+        <!-- POSTER -->
+        <div class="detail-poster-wrap">
+          <div class="detail-poster">
+            <img src="{{ movie.poster_url }}" alt="{{ movie.title }}"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <div class="big-poster-fallback" style="display:none;background:linear-gradient(135deg,hsl({{movie.id*37%360}},45%,40%),hsl({{(movie.id*37+80)%360}},55%,50%))">{{ movie.title }}</div>
+          </div>
+
+          <!-- Watchlist button -->
+          <button class="btn-wl-detail" id="wlDetailBtn"
+                  onclick="toggleWatchlist({{movie.id}},'{{movie.title}}','{{movie.poster_url}}');this.classList.toggle('active')">
+            🔖 Add to Watchlist
+          </button>
+
+          <!-- Thumbs feedback — ONLY HERE on movie detail, nowhere else -->
+          <div class="detail-thumbs" id="detail-thumb-{{movie.id}}">
+            <span class="detail-thumbs-label">Was this a good pick?</span>
+            <div class="detail-thumbs-row">
+              <button class="thumb-btn thumb-up thumb-lg"
+                      onclick="detailThumbsFeedback({{movie.id}},'up')"
+                      title="Yes, I liked this">👍 Like</button>
+              <button class="thumb-btn thumb-down thumb-lg"
+                      onclick="detailThumbsFeedback({{movie.id}},'down')"
+                      title="Not for me">👎 Not for me</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- INFO -->
+        <div class="detail-info">
+          <div class="detail-genres">
+            {% for g in movie.genre.split('|') %}<span class="genre-tag light">{{ g }}</span>{% endfor %}
+          </div>
+          <h1 class="detail-title">{{ movie.title }}</h1>
+          <div class="detail-meta-row">
+            <span class="meta-pill">{{ movie.year }}</span>
+            {% if movie.runtime %}<span class="meta-pill">{{ movie.runtime }} min</span>{% endif %}
+            {% if movie.language %}<span class="meta-pill">{{ movie.language }}</span>{% endif %}
+          </div>
+          {% if movie.director %}
+          <div class="detail-crew">
+            <span class="crew-label">Director</span>
+            <span class="crew-value">{{ movie.director }}</span>
+          </div>
+          {% endif %}
+          <p class="detail-description">{{ movie.description }}</p>
+          {% if cast_list %}
+          <div class="cast-section">
+            <p class="cast-label">Cast</p>
+            <div class="cast-list">
+              {% for actor in cast_list %}
+              <div class="cast-chip">
+                <div class="cast-avatar">{{ actor[0] }}</div>
+                <span>{{ actor }}</span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRAILER -->
+  {% if movie.trailer_id %}
+  <div class="trailer-section">
+    <div class="trailer-inner">
+      <h2 class="section-title">▶ Watch Trailer</h2>
+      <div class="trailer-wrap">
+        <iframe src="https://www.youtube.com/embed/{{ movie.trailer_id }}"
+                title="{{ movie.title }} Trailer"
+                frameborder="0" allowfullscreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+        </iframe>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- YOU MIGHT ALSO LIKE — poster clickable, NO thumbs here -->
+  {% if recommendations %}
+  <section class="recommendations-section">
+    <div class="section-header">
+      <h2>You Might Also Like</h2>
+      <span class="movie-count">{{ recommendations|length }} picks</span>
+    </div>
+    <div class="sim-v-grid">
+      {% for rec in recommendations %}
+      <div class="sim-v-card">
+        <div class="sim-v-poster-wrap">
+          <!-- Entire poster + overlay clickable to detail -->
+          <a href="{{ url_for('movie_detail', movie_id=rec.id) }}" class="sim-v-poster-link">
+            <img src="{{ rec.poster_url }}" alt="{{ rec.title }}"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" loading="lazy">
+            <div class="poster-fallback" style="display:none;background:linear-gradient(135deg,hsl({{loop.index*53%360}},45%,35%),hsl({{(loop.index*53+70)%360}},55%,45%))">{{ rec.title }}</div>
+            <!-- Hover overlay with View Details -->
+            <div class="sim-poster-overlay">
+              <span class="sim-view-btn">View Details</span>
+            </div>
+          </a>
+        </div>
+        <div class="sim-v-body">
+          <strong class="sim-v-title">{{ rec.title }}</strong>
+          <div class="sim-v-meta">{{ rec.year }}{% if rec.runtime %} · {{ rec.runtime }}m{% endif %}</div>
+          <div class="sim-v-genres">
+            {% for g in rec.genre.split('|') %}<span class="genre-tag small">{{ g }}</span>{% endfor %}
+          </div>
+          {% if rec.match_reasons %}
+          <div class="sim-v-why">📎 {{ rec.match_reasons | join(' · ') }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+
+<script>
+// Thumbs ONLY on the movie detail itself — not on recommendation cards
+function detailThumbsFeedback(movieId, vote) {
+  fetch('/feedback', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({movie_id: movieId, vote})
+  }).then(r => r.json()).then(() => {
+    const box = document.getElementById('detail-thumb-' + movieId);
+    box.innerHTML = vote === 'up'
+      ? '<span class="thumb-thanks" style="font-size:.95rem;padding:.6rem 0;display:block;text-align:center">👍 Thanks! We\'ll recommend more like this.</span>'
+      : '<span class="thumb-thanks" style="font-size:.95rem;padding:.6rem 0;display:block;text-align:center">👎 Noted! We\'ll show you better picks.</span>';
+  });
+}
+
+// Watchlist button sync
+document.addEventListener('DOMContentLoaded', () => {
+  const wl = getWatchlist();
+  if (wl.some(w => w.id == {{ movie.id }})) {
+    const btn = document.getElementById('wlDetailBtn');
+    if (btn) { btn.classList.add('active'); btn.textContent = '🔖 In Watchlist'; }
+  }
+  syncWatchlistButtons();
+});
+</script>
+{% endblock %}

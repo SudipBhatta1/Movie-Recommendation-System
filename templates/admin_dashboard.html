@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — WatchNext Admin{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <div class="admin-header">
+    <div>
+      <a href="{{ url_for('index') }}" class="back-link">← Back to Site</a>
+      <h1>Movie Database</h1>
+      <p>Changes retrain the ML model automatically</p>
+    </div>
+    <a href="{{ url_for('admin_add_movie') }}" class="btn-primary">+ Add Movie</a>
+    <a href="{{ url_for('admin_users') }}" class="btn-primary" style="background:#0369a1;margin-left:.5rem">👥 Manage Users</a>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card"><span class="stat-num">{{ stats.total }}</span><span class="stat-label">Total Movies</span></div>
+    <div class="stat-card"><span class="stat-num">{{ stats.genres }}</span><span class="stat-label">Genres</span></div>
+    <div class="stat-card"><span class="stat-num">{{ stats.avg_rating }}</span><span class="stat-label">Avg Rating</span></div>
+    <div class="stat-card"><span class="stat-num small-text">{{ stats.top_rated }}</span><span class="stat-label">Top Rated</span></div>
+  </div>
+
+  <!-- CHARTS ROW -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Genre Distribution</h3>
+      <div class="bar-chart" id="genreChart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Rating Distribution</h3>
+      <div class="bar-chart" id="ratingChart"></div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="admin-table-section">
+    <div class="table-header">
+      <h2>All Movies</h2>
+      <input type="text" id="tableSearch" placeholder="Search..." oninput="filterTable(this.value)">
+    </div>
+    <div class="table-wrapper">
+      <table class="admin-table" id="movieTable">
+        <thead>
+          <tr>
+            <th>ID</th><th>Poster</th><th>Title</th><th>Director</th><th>Genre</th><th>Year</th><th>Rating</th><th>Runtime</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for movie in movies %}
+          <tr>
+            <td><span class="id-badge">{{ movie.id }}</span></td>
+            <td><img src="{{ movie.poster_url }}" style="width:36px;height:54px;object-fit:cover;border-radius:4px;" onerror="this.style.display='none'"></td>
+            <td class="title-cell">{{ movie.title }}</td>
+            <td style="color:#71717a;font-size:0.85rem">{{ movie.director or '—' }}</td>
+            <td>{% for g in movie.genre.split('|') %}<span class="genre-tag small">{{ g }}</span>{% endfor %}</td>
+            <td>{{ movie.year }}</td>
+            <td><span class="rating-badge">★ {{ movie.rating }}</span></td>
+            <td style="color:#71717a;font-size:0.85rem">{{ movie.runtime or '—' }}{% if movie.runtime %}m{% endif %}</td>
+            <td class="actions-cell">
+              <a href="{{ url_for('admin_edit_movie', movie_id=movie.id) }}" class="btn-edit">Edit</a>
+              <form method="POST" action="{{ url_for('admin_delete_movie', movie_id=movie.id) }}" style="display:inline" onsubmit="return confirm('Delete {{ movie.title }}?')">
+                <button type="submit" class="btn-delete">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterTable(q) {
+  document.querySelectorAll('#movieTable tbody tr').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// Genre chart
+const gc = {{ stats.genre_counts | tojson }};
+const gEntries = Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,8);
+const gMax = Math.max(...gEntries.map(e=>e[1]));
+document.getElementById('genreChart').innerHTML = gEntries.map(([g,c]) =>
+  `<div class="bar-row">
+     <span class="bar-label">${g}</span>
+     <div class="bar-track"><div class="bar-fill" style="width:${(c/gMax)*100}%">${c}</div></div>
+   </div>`
+).join('');
+
+// Rating chart
+const rd = {{ stats.rating_dist | tojson }};
+const rMax = Math.max(...Object.values(rd));
+document.getElementById('ratingChart').innerHTML = Object.entries(rd).map(([r,c]) =>
+  `<div class="bar-row">
+     <span class="bar-label">${r}–${parseInt(r)+1}★</span>
+     <div class="bar-track"><div class="bar-fill" style="width:${rMax?((c/rMax)*100):0}%;background:#d97706">${c}</div></div>
+   </div>`
+).join('');
+</script>
+{% endblock %}

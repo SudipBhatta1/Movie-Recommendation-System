@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard — WatchNext{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+
+  <!-- HEADER -->
+  <div class="dash-header">
+    <div class="dash-header-inner">
+      <div class="dash-avatar">{{ name[0].upper() }}</div>
+      <div>
+        <h1 class="dash-name">{{ name }}</h1>
+        <p class="dash-username">@{{ username }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-body">
+
+    <!-- STATS ROW -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num">{{ stats.watched }}</div>
+        <div class="stat-label">Movies Watched</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">{{ stats.fav_genre or '—' }}</div>
+        <div class="stat-label">Favourite Genre</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">{{ stats.fav_director or '—' }}</div>
+        <div class="stat-label">Favourite Director</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" style="color:#16a34a">👍 {{ stats.get('liked_count', 0) }}</div>
+        <div class="stat-label">Liked</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" style="color:#e63946">👎 {{ stats.get('disliked_count', 0) }}</div>
+        <div class="stat-label">Disliked</div>
+      </div>
+    </div>
+
+    <!-- FOR YOU -->
+    <section class="dash-section">
+      <div class="section-header">
+        <h2>🎯 Recommended For You</h2>
+        <span class="movie-count">
+          {% if stats.watched >= 5 %}Based on your watch history
+          {% elif stats.watched > 0 %}Watch {{ 5 - stats.watched }} more movies for better picks
+          {% else %}Top picks to get you started!{% endif %}
+        </span>
+      </div>
+      {% if stats.watched == 0 %}
+      <div class="cold-start-banner">
+        <span class="cold-icon">🎬</span>
+        <div>
+          <strong>No history yet!</strong>
+          <p>Browse movies and click on ones that interest you.</p>
+          <a href="{{ url_for('index') }}" class="btn-browse">Browse Movies →</a>
+        </div>
+      </div>
+      {% else %}
+      <div class="strip-scroll">
+        {% for movie in for_you %}
+        <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="strip-card">
+          <div class="strip-poster">
+            <img src="{{ movie.poster_url }}" alt="{{ movie.title }}"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" loading="lazy">
+            <div class="poster-fallback" style="display:none;background:linear-gradient(135deg,hsl({{loop.index*67%360}},45%,35%),hsl({{(loop.index*67+80)%360}},55%,45%))">{{movie.title}}</div>
+          </div>
+          <p class="strip-title">{{movie.title}}</p>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- WATCH HISTORY -->
+    <section class="dash-section">
+      <div class="section-header">
+        <h2>🕐 Watch History</h2>
+        <div style="display:flex;align-items:center;gap:1rem">
+          <span class="movie-count">{{ history|length }} movies</span>
+          {% if history %}
+          <button class="btn-clear" onclick="showClearHistoryPopup()">Clear History</button>
+          {% endif %}
+        </div>
+      </div>
+      {% if not history %}
+      <p class="empty-msg" style="padding:1.5rem 0">
+        No watch history yet. <a href="{{ url_for('index') }}">Browse movies →</a>
+      </p>
+      {% else %}
+      <div class="history-grid">
+        {% for movie in history %}
+        <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="history-card">
+          <div class="history-poster">
+            <img src="{{ movie.poster_url }}" alt="{{ movie.title }}"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" loading="lazy">
+            <div class="poster-fallback" style="display:none;background:linear-gradient(135deg,hsl({{loop.index*53%360}},45%,35%),hsl({{(loop.index*53+70)%360}},55%,45%))">{{movie.title}}</div>
+          </div>
+          <div class="history-info">
+            <strong class="history-title">{{ movie.title }}</strong>
+            <span class="history-meta">{{ movie.year }}</span>
+            <div class="history-genres">
+              {% for g in movie.genre.split('|')[:2] %}
+              <span class="genre-tag small">{{ g }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+  </div>
+</div>
+
+<!-- Clear History Popup — INSIDE content block, AFTER the page content -->
+<div class="logout-overlay" id="clearHistoryOverlay" onclick="hideClearHistoryPopup()">
+  <div class="logout-modal" onclick="event.stopPropagation()">
+    <div class="logout-icon">🗑️</div>
+    <h3 class="logout-title">Clear watch history?</h3>
+    <p class="logout-sub">This will remove all your watched movies and reset your personalised recommendations.</p>
+    <div class="logout-actions">
+      <button class="btn-secondary" onclick="hideClearHistoryPopup()">Cancel</button>
+      <form method="POST" action="{{ url_for('clear_history') }}" style="margin:0">
+        <button type="submit" class="btn-primary" style="border:none;cursor:pointer;font-family:inherit">Yes, clear it</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function showClearHistoryPopup() {
+  document.getElementById('clearHistoryOverlay').classList.add('active');
+}
+function hideClearHistoryPopup() {
+  document.getElementById('clearHistoryOverlay').classList.remove('active');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') hideClearHistoryPopup();
+});
+</script>
+{% endblock %}

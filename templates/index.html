@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}WatchNext — Discover Movies You'll Love{% endblock %}
+{% block content %}
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    {% if username %}
+    <h1 class="hero-title">Welcome back,<br><em>{{ session.get('user_name', username) }}!</em></h1>
+    <p class="hero-sub">Your personalised movie feed — ranked just for you.</p>
+    {% else %}
+    <h1 class="hero-title">What Should You<br><em>Watch Next?</em></h1>
+    <p class="hero-sub">Search by title, actor, or director. Filter by genre.</p>
+    {% endif %}
+    <div class="search-bar">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="searchInput" placeholder="Search movies, actors, directors..." autocomplete="off">
+      <button onclick="searchMovies()">Search</button>
+    </div>
+    <div class="filter-row">
+      <div class="genre-filters" id="genreFilters">
+        <button class="genre-btn active" onclick="filterGenre('',this)">All</button>
+        {% for genre in genres %}
+        <button class="genre-btn" onclick="filterGenre('{{genre}}',this)">{{genre}}</button>
+        {% endfor %}
+      </div>
+      <div class="sort-rating-row">
+        <select id="sortSelect" onchange="searchMovies(true)" class="sort-select">
+          <option value="">Sort: Default</option>
+          <option value="rating">★ Top Rated</option>
+          <option value="year">📅 Newest</option>
+          <option value="title">🔤 A–Z</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COLD START BANNER (logged in but no history yet) -->
+{% if username and history_count == 0 %}
+<section class="strip-section">
+  <div class="strip-inner">
+    <div class="cold-start-banner">
+      <span class="cold-icon">🎬</span>
+      <div>
+        <strong>Start watching to get personalised picks!</strong>
+        <p>Click on any movie below. After a few clicks we'll learn your taste and rank everything just for you.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- MAIN GRID — for logged-in users this IS the personalised feed -->
+<section class="movies-section">
+  <div class="section-header">
+    {% if username %}
+    <h2 id="gridTitle">🎯 Top Picks For You</h2>
+    {% else %}
+    <h2 id="gridTitle">All Movies</h2>
+    {% endif %}
+    <span class="movie-count" id="movieCount">{{movies|length}} titles</span>
+  </div>
+  <div class="movies-grid" id="moviesGrid">
+    {% for movie in movies %}
+    <div class="movie-card" data-id="{{movie.id}}">
+      <div class="card-poster">
+        <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="poster-link" aria-label="View {{movie.title}}">
+          <img src="{{movie.poster_url}}" alt="{{movie.title}}"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" loading="lazy">
+          <div class="poster-fallback" style="display:none;background:linear-gradient(135deg,hsl({{loop.index*37%360}},45%,35%),hsl({{(loop.index*37+60)%360}},55%,45%))">{{movie.title}}</div>
+        </a>
+        <button class="wl-btn" onclick="event.stopPropagation();toggleWatchlist({{movie.id}},'{{movie.title}}','{{movie.poster_url}}')" title="Add to Watchlist" id="wl-{{movie.id}}">🔖</button>
+        <div class="card-overlay">
+          <button class="btn-recommend" onclick="event.stopPropagation();getRecommendations('{{movie.title}}')">Find Similar ›</button>
+        </div>
+      </div>
+      <div class="card-info">
+        <h3 class="card-title" title="{{movie.title}}">{{movie.title}}</h3>
+        <div class="card-meta">
+          <span class="card-year">{{movie.year}}</span>
+          <span class="card-rating">★ {{movie.rating}}</span>
+          {% if movie.runtime %}<span class="card-runtime">{{movie.runtime}}m</span>{% endif %}
+        </div>
+        {% if movie.director %}<p class="card-director">Dir. {{movie.director}}</p>{% endif %}
+        <div class="card-genres">
+          {% for g in movie.genre.split('|') %}<span class="genre-tag">{{g}}</span>{% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- BACK TO TOP / HOMEPAGE shortcut — shown below the grid -->
+<div class="homepage-shortcut" id="homepageShortcut">
+  <a href="{{ url_for('index') }}" class="btn-goto-home">
+    ▶ WatchNext — Back to Top
+  </a>
+
+</div>
+
+<!-- FIND SIMILAR MODAL — no thumbs here, clean cards only -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-header">
+      <p class="modal-label">Because you liked</p>
+      <h2 class="modal-title" id="modalTitle"></h2>
+    </div>
+    <div class="sim-v-grid" id="modalGrid"></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const IS_LOGGED_IN = {{ 'true' if username else 'false' }};
+let activeGenre = '';
+
+function searchMovies(scroll = false) {
+  const q    = document.getElementById('searchInput').value.trim();
+  const sort = document.getElementById('sortSelect').value;
+
+  // When a genre is selected → always use plain search so genre results
+  // are not overridden by personalisation. Personalisation only applies
+  // when browsing "All" with no genre filter.
+  const usePersonalised = IS_LOGGED_IN && !activeGenre && !q;
+  const endpoint = usePersonalised
+    ? `/user/search_for_you?q=&genre=&sort=${sort}`
+    : `/search?q=${encodeURIComponent(q)}&genre=${activeGenre}&sort=${sort}`;
+
+  fetch(endpoint).then(r => r.json()).then(data => {
+    if (IS_LOGGED_IN && !activeGenre && !q) {
+      document.getElementById('gridTitle').textContent = `🎯 Top Picks For You`;
+    } else if (IS_LOGGED_IN && activeGenre) {
+      document.getElementById('gridTitle').textContent = `🎬 ${activeGenre} Movies`;
+    } else if (IS_LOGGED_IN && q) {
+      document.getElementById('gridTitle').textContent = `🔍 Results For You`;
+    } else if (activeGenre) {
+      document.getElementById('gridTitle').textContent = `🎬 ${activeGenre} Movies`;
+    } else {
+      document.getElementById('gridTitle').textContent = q ? 'Search Results' : 'All Movies';
+    }
+
+    if (data.not_found && data.suggestions && data.suggestions.length) {
+      showNotFound(data.query, data.suggestions);
+    } else if (data.not_found) {
+      showNotFoundEmpty(data.query);
+    } else {
+      renderMovies(data.movies);
+    }
+    if (scroll) scrollToGrid();
+  });
+}
+
+function showNotFound(query, suggestions) {
+  const grid = document.getElementById('moviesGrid');
+  document.getElementById('movieCount').textContent = '0 titles';
+  document.getElementById('gridTitle').textContent  = '🔍 Search Results';
+
+  const suggCards = suggestions.map((m, i) =>
+    `<div class="movie-card">
+      <div class="card-poster">
+        <a href="/movie/${m.id}" class="poster-link">
+          <img src="${m.poster_url||''}" alt="${m.title}"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" loading="lazy">
+          <div class="poster-fallback" style="display:none;background:linear-gradient(135deg,hsl(${i*53%360},45%,35%),hsl(${(i*53+70)%360},55%,45%))">${m.title}</div>
+        </a>
+        <div class="card-overlay">
+          <button class="btn-recommend" onclick="event.stopPropagation();getRecommendations('${m.title.replace(/'/g,"\\'")}')">Find Similar ›</button>
+        </div>
+      </div>
+      <div class="card-info">
+        <h3 class="card-title">${m.title}</h3>
+        <div class="card-meta"><span class="card-year">${m.year}</span><span class="card-rating">★ ${m.rating}</span></div>
+        <div class="card-genres">${(m.genre||'').split('|').map(g=>`<span class="genre-tag">${g}</span>`).join('')}</div>
+      </div>
+    </div>`
+  ).join('');
+
+  grid.innerHTML = `
+    <div class="not-found-banner">
+      <div class="not-found-icon">🔍</div>
+      <h3 class="not-found-title">No results for "<em>${query}</em>"</h3>
+      <p class="not-found-sub">This movie isn't in our database yet. You might like these instead:</p>
+    </div>
+    <div class="not-found-suggestions">${suggCards}</div>`;
+}
+
+function showNotFoundEmpty(query) {
+  const grid = document.getElementById('moviesGrid');
+  document.getElementById('movieCount').textContent = '0 titles';
+  grid.innerHTML = `
+    <div class="not-found-banner">
+      <div class="not-found-icon">🎬</div>
+      <h3 class="not-found-title">No results for "<em>${query}</em>"</h3>
+      <p class="not-found-sub">This movie isn't in our database. Try a different title, actor or director.</p>
+      <button class="btn-auth" style="margin-top:.8rem;padding:.5rem 1.4rem;font-size:.9rem" onclick="document.getElementById('searchInput').value='';searchMovies()">Clear Search</button>
+    </div>`;
+}
+
+function filterGenre(genre, btn) {
+  document.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeGenre = genre;
+  // Clear search box when switching genre so results are clean
+  if (genre) document.getElementById('searchInput').value = '';
+  searchMovies(true);
+}
+
+function scrollToGrid() {
+  const grid = document.getElementById('moviesGrid');
+  if (grid) window.scrollTo({ top: grid.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+}
+
+function renderMovies(movies) {
+  const grid = document.getElementById('moviesGrid');
+  document.getElementById('movieCount').textContent = `${movies.length} titles`;
+  if (!movies.length) {
+    grid.innerHTML = '<div class="no-results">No movies found.</div>';
+    return;
+  }
+  const wl = getWatchlist();
+  grid.innerHTML = movies.map((m, i) => {
+    const inWl = wl.some(w => w.id == m.id);
+    return `<div class="movie-card">
+      <div class="card-poster">
+        <a href="/movie/${m.id}" class="poster-link" aria-label="${m.title}">
+          <img src="${m.poster_url||''}" alt="${m.title}"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" loading="lazy">
+          <div class="poster-fallback" style="display:none;background:linear-gradient(135deg,hsl(${i*37%360},45%,35%),hsl(${(i*37+60)%360},55%,45%))">${m.title}</div>
+        </a>
+        <button class="wl-btn ${inWl?'active':''}" onclick="event.stopPropagation();toggleWatchlist(${m.id},'${m.title.replace(/'/g,"\\'")}','${(m.poster_url||'').replace(/'/g,"\\'")}');this.classList.toggle('active')" title="Watchlist" id="wl-${m.id}">🔖</button>
+        <div class="card-overlay">
+          <button class="btn-recommend" onclick="event.stopPropagation();getRecommendations('${m.title.replace(/'/g,"\\'")}')">Find Similar ›</button>
+        </div>
+      </div>
+      <div class="card-info">
+        <h3 class="card-title" title="${m.title}">${m.title}</h3>
+        <div class="card-meta">
+          <span class="card-year">${m.year}</span>
+          <span class="card-rating">★ ${m.rating}</span>
+          ${m.runtime ? `<span class="card-runtime">${m.runtime}m</span>` : ''}
+        </div>
+        ${m.director ? `<p class="card-director">Dir. ${m.director}</p>` : ''}
+        <div class="card-genres">${(m.genre||'').split('|').map(g=>`<span class="genre-tag">${g}</span>`).join('')}</div>
+      </div>
+    </div>`;
+  }).join('');
+  syncWatchlistButtons();
+}
+
+// Find Similar modal — clean cards only, NO thumbs (thumbs are on movie detail page)
+function getRecommendations(title) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalGrid').innerHTML = '<div class="loading-spin"></div>';
+  document.getElementById('modalOverlay').classList.add('active');
+  fetch('/recommend', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title})
+  }).then(r => r.json()).then(data => {
+    const grid = document.getElementById('modalGrid');
+    if (!data.recommendations.length) {
+      grid.innerHTML = '<p style="color:#888;padding:1rem">No recommendations found.</p>';
+      return;
+    }
+    // Clean cards — no thumbs, no %, just info + click to details
+    grid.innerHTML = data.recommendations.map((m, i) => {
+      const reasons = (m.match_reasons || []).join(' · ');
+      return `<a href="/movie/${m.id}" class="sim-v-card sim-v-card-link">
+        <div class="sim-v-poster">
+          <img src="${m.poster_url||''}" alt="${m.title}"
+               onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,hsl(${i*53%360},40%,30%),hsl(${(i*53+80)%360},45%,40%))'" loading="lazy">
+        </div>
+        <div class="sim-v-body">
+          <strong class="sim-v-title">${m.title}</strong>
+          <div class="sim-v-meta">${m.year}${m.runtime ? ' · '+m.runtime+'m' : ''}</div>
+          <div class="sim-v-genres">${(m.genre||'').split('|').slice(0,2).map(g=>`<span class="genre-tag small">${g}</span>`).join('')}</div>
+          ${reasons ? `<div class="sim-v-why">📎 ${reasons}</div>` : ''}
+        </div>
+      </a>`;
+    }).join('');
+  });
+}
+
+function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+
+document.getElementById('searchInput').addEventListener('keypress', e => {
+  if (e.key === 'Enter') searchMovies(true);
+});
+document.addEventListener('DOMContentLoaded', () => {
+  syncWatchlistButtons();
+  updateWlBadge();
+});
+
+// Force homepage to reload fresh when user navigates back from a movie
+// This ensures the personalised feed reflects the latest click
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) {
+    // Page was loaded from browser cache (back button) — reload to get fresh rankings
+    window.location.reload();
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WatchNext{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+<nav class="navbar">
+    <div class="nav-inner">
+        <a href="{{ url_for('index') }}" class="nav-logo">
+            <span class="logo-play">▶</span>
+            <span class="logo-text">WatchNext</span>
+        </a>
+        <div class="nav-center">
+            <a href="{{ url_for('index') }}">Browse</a>
+            <a href="#" onclick="openWatchlist()">My Watchlist <span class="wl-badge" id="navWlBadge" style="display:none">0</span></a>
+            {% if session.get('user_logged_in') %}
+            <a href="{{ url_for('user_dashboard') }}">My Dashboard</a>
+            {% endif %}
+        </div>
+        <div class="nav-right">
+            {# If admin is logged in → show ONLY admin panel + admin logout, no user links #}
+            {% if session.get('admin_logged_in') %}
+                <a href="{{ url_for('admin_dashboard') }}" class="btn-nav-admin">Admin Panel</a>
+                <a href="#" class="nav-logout" onclick="showAdminLogoutConfirm(event)">Admin Logout</a>
+            {% else %}
+                {# Normal user nav #}
+                {% if session.get('user_logged_in') %}
+                    <a href="{{ url_for('user_dashboard') }}" class="btn-nav-user">
+                        👤 {{ session.get('user_name', 'My Account') }}
+                    </a>
+                    <a href="#" class="nav-logout" onclick="showUserLogoutConfirm(event)">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('user_login') }}" class="btn-nav-user">Login</a>
+                    <a href="{{ url_for('user_register') }}" class="btn-nav-signup">Sign Up</a>
+                {% endif %}
+                {# Admin button: only show on homepage/admin pages AND only when NO user is logged in #}
+                {% if not session.get('user_logged_in') %}
+                    {% set path = request.path %}
+                    {% if path == '/' or path.startswith('/admin') %}
+                        <a href="{{ url_for('admin_login') }}" class="btn-nav-admin">Admin</a>
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<!-- User Logout Popup -->
+<div class="logout-overlay" id="userLogoutOverlay" onclick="hideUserLogoutConfirm()">
+  <div class="logout-modal" onclick="event.stopPropagation()">
+    <div class="logout-icon">👤</div>
+    <h3 class="logout-title">Log out?</h3>
+    <p class="logout-sub">You'll need to log in again to see your personalised recommendations.</p>
+    <div class="logout-actions">
+      <button class="btn-secondary" onclick="hideUserLogoutConfirm()">Cancel</button>
+      <a href="{{ url_for('user_logout') }}" class="btn-primary">Yes, log out</a>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Logout Popup -->
+<div class="logout-overlay" id="adminLogoutOverlay" onclick="hideAdminLogoutConfirm()">
+  <div class="logout-modal" onclick="event.stopPropagation()">
+    <div class="logout-icon">🔒</div>
+    <h3 class="logout-title">Admin log out?</h3>
+    <p class="logout-sub">You'll need your admin credentials to access the panel again.</p>
+    <div class="logout-actions">
+      <button class="btn-secondary" onclick="hideAdminLogoutConfirm()">Cancel</button>
+      <a href="{{ url_for('admin_logout') }}" class="btn-primary">Yes, log out</a>
+    </div>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-container">
+      {% for cat, msg in messages %}
+        <div class="flash flash-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<main>{% block content %}{% endblock %}</main>
+
+<!-- Watchlist Drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeWatchlist()">
+    <div class="drawer" onclick="event.stopPropagation()">
+        <div class="drawer-header">
+            <h3>My Watchlist</h3>
+            <button onclick="closeWatchlist()" class="drawer-close">✕</button>
+        </div>
+        <div class="drawer-body" id="watchlistBody">
+            <p class="empty-msg">Your watchlist is empty.<br>Click the bookmark icon on any movie!</p>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block extra_js %}{% endblock %}
+<script>
+function showUserLogoutConfirm(e) {
+  e.preventDefault();
+  document.getElementById('userLogoutOverlay').classList.add('active');
+}
+function hideUserLogoutConfirm() {
+  document.getElementById('userLogoutOverlay').classList.remove('active');
+}
+function showAdminLogoutConfirm(e) {
+  e.preventDefault();
+  document.getElementById('adminLogoutOverlay').classList.add('active');
+}
+function hideAdminLogoutConfirm() {
+  document.getElementById('adminLogoutOverlay').classList.remove('active');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    hideUserLogoutConfirm();
+    hideAdminLogoutConfirm();
+  }
+});
+</script>
+</body>
+</html>
